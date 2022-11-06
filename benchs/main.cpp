@@ -1,12 +1,18 @@
 #include <iostream>
-#include <vector>
-#include <algorithm>
-#include <map>
-#include <unordered_set>
 #include <iomanip>
+#include <vector>
+#include <unordered_set>
 #include "timestamp.hpp"
 #include "../fast_hashmap.hpp"
-#include <nmmintrin.h>
+#include <cstring>
+
+int variable_test_and_set_bit64(uint64_t &n, uint64_t bit) {
+    int oldbit;
+    asm("bts %2,%0"
+        : "+r" (n), "=@ccc" (oldbit)
+        : "r" (bit));
+    return oldbit;
+}
 
 inline size_t get_aligned( size_t count, size_t align )
 {
@@ -46,9 +52,9 @@ struct std_uset
     size_t count() const { return s.size(); }
 };
 
-struct bitmap_set
+struct bitmap_set_std
 {
-    bitmap_set( size_t max_set ) : bm(max_set), count_(0) {}
+    bitmap_set_std( size_t max_set ) : bm(max_set), count_(0) {}
 
     bool insert( uint32_t id )
     {
@@ -71,9 +77,9 @@ struct bitmap_set
     size_t count_;
 };
 
-struct bitmap_set_fclear
+struct bitmap_set_asm
 {
-    bitmap_set_fclear( size_t max_capacity )
+    bitmap_set_asm( size_t max_capacity )
         : count_(0)
         , capacity_( get_aligned(max_capacity, 256) / 8 )
         , bitmap_( static_cast<uint64_t*>(aligned_malloc(capacity_, 32)) )
@@ -81,24 +87,17 @@ struct bitmap_set_fclear
             memset(bitmap_, 0, capacity_);
         }
 
-    ~bitmap_set_fclear()
+    ~bitmap_set_asm()
     {
         free(bitmap_);
     }
 
-    bool is_marked( uint32_t docid ) const
-    {
-        uint64_t const w = bitmap_[ docid / 64U ];
-        return ((w >> (docid % 64U)) & 1UL) == 1UL;
-    }
-
     bool insert( uint32_t docid )
     {
-        if( is_marked(docid) )
+        if( variable_test_and_set_bit64(bitmap_[docid / 64U], docid % 64U) )
         {
             return false;
         }
-        bitmap_[docid / 64U] |= 1UL << (docid % 64U);
         ++count_;
         return true;
     }
@@ -157,9 +156,9 @@ int main()
         {
             std_uset gs(count);
             benchmark(gs, max_id, count);
-            bitmap_set bm(max_id);
+            bitmap_set_std bm(max_id);
             benchmark(bm, max_id, count);
-            bitmap_set_fclear bm2(max_id);
+            bitmap_set_asm bm2(max_id);
             benchmark(bm2, max_id, count);
             fast_hashset30<2, 8> fhs(count);
             benchmark(fhs, max_id, count);

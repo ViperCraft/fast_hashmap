@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 #include <stdint.h>
+#include <limits.h> // for CHAR_BIT
 #include <type_traits>
 
 namespace utils {
@@ -39,7 +40,7 @@ class fast_hashsetimpl
 protected:
     struct KeyFlags
     {
-        T key       : sizeof(T) * 8 - 2;
+        T key       : sizeof(T) * CHAR_BIT - 2;
         T is_offs   : 1;
         T occupied  : 1;
     };
@@ -169,7 +170,7 @@ class fast_hashset_fclear
 
     struct KeyFlags
     {
-        T key       : sizeof(T) * 8 - 2;
+        T key       : sizeof(T) * CHAR_BIT - 2;
         T is_offs   : 1;
         T occupied  : 1;
     };
