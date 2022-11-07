@@ -32,20 +32,17 @@ Some benchmarking on **Intel(R) Core(TM) i7-8850H CPU @ 2.60GHz**:
 
 ```shell
 Perform insert and clear tests for several container types.
-  for count=1000 max_value=10000000 type=8std_uset => 84 millis.
+  for count=1000 max_value=10000000 type=8std_uset => 96 millis.
   for count=1000 max_value=10000000 type=14bitmap_set_std => 1 millis.
-  for count=1000 max_value=10000000 type=14bitmap_set_asm => 22 millis.
+  for count=1000 max_value=10000000 type=14bitmap_set_asm => 24 millis.
   for count=1000 max_value=10000000 type=14fast_hashset30ILj2ELj8EE => 3 millis.
-  for count=1000 max_value=10000000 type=19fast_hashset_fclearIjN5utils6hash32ELj2ELj8EE => 5 millis.
-  for count=20000 max_value=10000000 type=8std_uset => 1686 millis.
+  for count=20000 max_value=10000000 type=8std_uset => 1695 millis.
   for count=20000 max_value=10000000 type=14bitmap_set_std => 30 millis.
   for count=20000 max_value=10000000 type=14bitmap_set_asm => 52 millis.
-  for count=20000 max_value=10000000 type=14fast_hashset30ILj2ELj8EE => 181 millis.
-  for count=20000 max_value=10000000 type=19fast_hashset_fclearIjN5utils6hash32ELj2ELj8EE => 255 millis.
-  for count=200000 max_value=10000000 type=8std_uset => 22571 millis.
-  for count=200000 max_value=10000000 type=14bitmap_set_std => 301 millis.
-  for count=200000 max_value=10000000 type=14bitmap_set_asm => 355 millis.
-  for count=200000 max_value=10000000 type=14fast_hashset30ILj2ELj8EE => 2216 millis.
-  for count=200000 max_value=10000000 type=19fast_hashset_fclearIjN5utils6hash32ELj2ELj8EE => 3208 millis.
+  for count=20000 max_value=10000000 type=14fast_hashset30ILj2ELj8EE => 184 millis.
+  for count=200000 max_value=10000000 type=8std_uset => 24534 millis.
+  for count=200000 max_value=10000000 type=14bitmap_set_std => 306 millis.
+  for count=200000 max_value=10000000 type=14bitmap_set_asm => 346 millis.
+  for count=200000 max_value=10000000 type=14fast_hashset30ILj2ELj8EE => 2295 millis.
 ```
 

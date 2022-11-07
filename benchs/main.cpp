@@ -162,8 +162,6 @@ int main()
             benchmark(bm2, max_id, count);
             fast_hashset30<2, 8> fhs(count);
             benchmark(fhs, max_id, count);
-            fast_hashset_fclear<uint32_t, utils::hash32, 2, 8> fhs2(count);
-            benchmark(fhs2, max_id, count);
         }
     }
 
