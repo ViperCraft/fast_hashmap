@@ -132,6 +132,7 @@ public:
 
     void clear()
     {
+        count_ = 0;
         memset(ha.get(), 0, size_ * sizeof(node));
         olist.clear();
     }

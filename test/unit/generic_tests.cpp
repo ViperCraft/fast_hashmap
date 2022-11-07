@@ -46,6 +46,7 @@ TEST(AfterClear, TestIsTrue)
         {
             EXPECT_EQ(0UL, test_insert(fhs, 1000000U, count));
             fhs.clear();
+            EXPECT_EQ(0UL, fhs.count());
         }
     }
 }
