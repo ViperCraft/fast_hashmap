@@ -37,6 +37,16 @@ TEST(Insert64, TestIsTrue)
     }
 }
 
+TEST(BitmapInsert, TestIsTrue)
+{
+    size_t max_id = 1000000U;
+    for( size_t count : { 1000, 10000, 200000} )
+    {
+        bitmap_fclear bm(max_id);
+        EXPECT_EQ(0UL, test_insert(bm, max_id, count));
+    }  
+}
+
 TEST(AfterClear, TestIsTrue)
 {
     for( size_t count : { 1000, 10000, 200000} )
@@ -47,6 +57,21 @@ TEST(AfterClear, TestIsTrue)
             EXPECT_EQ(0UL, test_insert(fhs, 1000000U, count));
             fhs.clear();
             EXPECT_EQ(0UL, fhs.count());
+        }
+    }
+}
+
+TEST(BitmapAfterClear, TestIsTrue)
+{
+    size_t max_id = 1000000U;
+    for( size_t count : { 1000, 10000, 200000} )
+    {
+        bitmap_fclear bm(max_id);
+        for( uint32_t i = 0; i < 3; ++i )
+        {
+            EXPECT_EQ(0UL, test_insert(bm, max_id, count));
+            bm.clear();
+            EXPECT_EQ(0UL, bm.count());
         }
     }
 }

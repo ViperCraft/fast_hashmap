@@ -6,22 +6,6 @@
 #include "../fast_hashmap.hpp"
 #include <cstring>
 
-inline size_t get_aligned( size_t count, size_t align )
-{
-    if( count & ( align - 1 ) )
-        count = (count + align) & ~( align - 1 );
-    return count;
-}
-
-inline void* aligned_malloc( size_t sz, size_t alignment = 16 )
-{
-    void *out_bytes;
-    if( posix_memalign(&out_bytes, alignment, sz) )
-        throw std::runtime_error("aligned_malloc: failed to allocate!");
-
-    return out_bytes;
-}
-
 struct std_uset
 {
     std::unordered_set<uint32_t> s;
@@ -73,7 +57,7 @@ struct bitmap_set_raw
 {
     bitmap_set_raw( size_t max_capacity )
         : count_(0)
-        , capacity_( get_aligned(max_capacity, 256) / 8 )
+        , capacity_( utils::get_aligned(max_capacity, 256) / 8 )
         , bitmap_( static_cast<uint64_t*>(calloc(capacity_ / 8, 8)) )
         {
         }
@@ -125,7 +109,7 @@ void benchmark( T &cont, uint32_t max_id, size_t count )
     }
 
     Timestamp ts;
-    for( size_t i = 0; i < 1000; ++i )
+    for( size_t i = 0; i < 3000; ++i )
     {
         for( auto v : values )
             cont.insert(v);
@@ -146,8 +130,8 @@ int main()
 {
     {
         std::cout << "Perform insert and clear tests for several container types.\n";
-        uint32_t max_id = 10000000;
-        for( size_t count : { 1000, 20000, 200000 } )
+        uint32_t max_id = 10000000U;
+        for( size_t count : { 500, 1000, 8000, 20000, 100000, 250000 } )
         {
             std_uset gs(count);
             benchmark(gs, max_id, count);
@@ -155,6 +139,8 @@ int main()
             benchmark(bm, max_id, count);
             bitmap_set_raw bm2(max_id);
             benchmark(bm2, max_id, count);
+            bitmap_fclear bm3(max_id);
+            benchmark(bm3, max_id, count);
             fast_hashset30<2, 8> fhs(count);
             benchmark(fhs, max_id, count);
         }

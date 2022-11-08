@@ -5,8 +5,16 @@
 #include <stdint.h>
 #include <limits.h> // for CHAR_BIT
 #include <type_traits>
+#include <immintrin.h>
 
 namespace utils {
+
+inline size_t get_aligned( size_t count, size_t align )
+{
+    if( count & ( align - 1 ) )
+        count = (count + align) & ~( align - 1 );
+    return count;
+}
 
 template<typename T>
 inline T rotl( T n, uint32_t c )
@@ -29,6 +37,30 @@ struct hash32
         return rotl(k, 29) ^ k;
     }
 };
+
+// fast zeroing block size of 64 bytes
+inline void zero_mem64( void *mem, size_t capacity )
+{
+    size_t cap = capacity / 64;
+    __m128i *store_ptr = (__m128i*)mem;
+    __m128i z = _mm_setzero_si128();
+    for( size_t i = 0; i < cap; ++i )
+    {
+        _mm_store_si128(store_ptr + i * 4 + 0, z);
+        _mm_store_si128(store_ptr + i * 4 + 1, z);
+        _mm_store_si128(store_ptr + i * 4 + 2, z);
+        _mm_store_si128(store_ptr + i * 4 + 3, z);
+    }
+}
+
+inline void* aligned_malloc( size_t sz, size_t alignment = 64 )
+{
+    void *out_bytes;
+    if( posix_memalign(&out_bytes, alignment, sz) )
+        throw std::runtime_error("aligned_malloc: failed to allocate!");
+
+    return out_bytes;
+}
 
 } // namespace utils
 
@@ -53,7 +85,7 @@ private:
 
     struct big_node
     {
-        big_node( T key0, T key1 ) 
+        big_node( T key0, T key1 )
         {
             keys[0].key = key0;
             keys[0].is_offs = 0;
@@ -76,7 +108,7 @@ private:
     };
 
 public:
-    fast_hashsetimpl( size_t max_set ) 
+    fast_hashsetimpl( size_t max_set )
         : ha( static_cast<node*>(calloc(max_set, sizeof(node))), free )
         , size_(max_set), count_(0)
         {
@@ -103,7 +135,7 @@ public:
         // traverse deep into big nodes ?
         if( n.keys[node_keys - 1].is_offs )
             return traverse(key, olist[n.keys[node_keys - 1].key]);
-        
+
         allocate_big(key, n.keys[node_keys - 1]);
         return true;
     }
@@ -153,7 +185,7 @@ private:
 
     void allocate_big( T key, KeyFlags &last_k )
     {
-        // move key from last node 
+        // move key from last node
         // to the first key in new big node
         uint32_t key0 = last_k.key;
         uint32_t offs = olist.size();
@@ -234,4 +266,102 @@ struct fast_hashset62 : fast_hashsetimpl<uint64_t, utils::hash32, node_keys, big
     using B = fast_hashsetimpl<uint64_t, utils::hash32, node_keys, big_node_keys>;
     static_assert( sizeof(typename B::KeyFlags) == 8 );
     using fast_hashsetimpl<uint64_t, utils::hash32, node_keys, big_node_keys>::fast_hashsetimpl;
+};
+
+
+// generic bitmap with fast clear
+// for example you have relative large bitmap with very low(<2%) fill
+// to reduce clear penalty, this class provides additinal bitmap
+// to clear every N(64-512) bytes of main bitmap only if we have hit into it
+class bitmap_fclear
+{
+    static size_t constexpr page_size = 64; // bytes
+    static size_t constexpr page_size_words = page_size / sizeof(uint64_t);
+    static size_t constexpr page_size_bits = page_size * 8;
+    static_assert( page_size >= 64 );
+public:
+    bitmap_fclear( size_t max_capacity )
+        : count_(0)
+        , small_capacity_(utils::get_aligned(max_capacity / page_size_bits, 
+            64) / sizeof(uint64_t))
+        , total_wsz_(utils::get_aligned(max_capacity, 
+            page_size_bits) / 64 /*main bitmap*/ + small_capacity_)
+        , bitmap_( static_cast<uint64_t*>(utils::aligned_malloc(total_wsz_ * sizeof(uint64_t))) )
+        , clear_bm_(bitmap_ + utils::get_aligned(max_capacity, 
+            page_size_bits) / 64)
+        {
+            utils::zero_mem64(bitmap_, total_wsz_ * sizeof(uint64_t));
+        }
+
+    ~bitmap_fclear()
+    {
+        free(bitmap_);
+    }
+
+    bool insert( size_t id )
+    {
+        uint64_t &w = bitmap_[ id / 64 ];
+        if( 0 == ((w >> (id % 64)) & 1UL)  )
+        {
+            touch_bm(w, id);
+            if( count_ < small_capacity_ )
+                touch_bm(clear_bm_, id / page_size_bits);
+            ++count_;
+            return true;
+        }
+
+        return false;
+    }
+    size_t count() const { return count_; }
+
+    void clear()
+    {
+        uint32_t pos;
+        uint32_t cnt = count_;
+        uint64_t wposes;
+        count_ = 0;
+        if( cnt < small_capacity_ )
+        {
+            // go thru small bitmap bits
+            for( uint64_t *offs = bitmap_, *it = clear_bm_, *end = it + small_capacity_; 
+                it != end; ++it, offs += page_size_words * 64 )
+            {
+                wposes = *it;
+                if( wposes )
+                {
+                    *it = 0;
+                    {
+                        // scan word and get bits poses one by one
+                        do
+                        {
+                            pos = __builtin_ffsll(wposes) - 1;
+                            // clear bit
+                            wposes &= (wposes - 1);
+                            // clear page
+                            utils::zero_mem64(offs + pos * page_size_words, page_size);
+                        }
+                        while( wposes > 0 );
+                    }
+                }
+            }
+        }
+        else
+        {
+            // bitmap is very dense, so zeroing all
+            utils::zero_mem64(bitmap_, total_wsz_ * sizeof(uint64_t));
+        }
+    }
+private:
+    void touch_bm( uint64_t &w, size_t addr )
+    {
+        w |= 1UL << (addr % 64);
+    }
+    void touch_bm( uint64_t *bm, size_t addr )
+    {
+        uint64_t &w = bm[ addr / 64 ];
+        touch_bm(w, addr);
+    }
+private:
+    uint32_t count_, small_capacity_, total_wsz_;
+    uint64_t *bitmap_, *clear_bm_;
 };
