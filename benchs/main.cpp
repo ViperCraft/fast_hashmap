@@ -6,14 +6,6 @@
 #include "../fast_hashmap.hpp"
 #include <cstring>
 
-int variable_test_and_set_bit64(uint64_t &n, uint64_t bit) {
-    int oldbit;
-    asm("bts %2,%0"
-        : "+r" (n), "=@ccc" (oldbit)
-        : "r" (bit));
-    return oldbit;
-}
-
 inline size_t get_aligned( size_t count, size_t align )
 {
     if( count & ( align - 1 ) )
@@ -70,23 +62,23 @@ struct bitmap_set_std
     void clear()
     {
         count_ = 0;
-        bm.clear();
+        bm.assign(bm.size(), 0);
     }
 
     std::vector<bool> bm;
     size_t count_;
 };
 
-struct bitmap_set_asm
+struct bitmap_set_raw
 {
-    bitmap_set_asm( size_t max_capacity )
+    bitmap_set_raw( size_t max_capacity )
         : count_(0)
         , capacity_( get_aligned(max_capacity, 256) / 8 )
         , bitmap_( static_cast<uint64_t*>(calloc(capacity_ / 8, 8)) )
         {
         }
 
-    ~bitmap_set_asm()
+    ~bitmap_set_raw()
     {
         free(bitmap_);
     }
@@ -161,7 +153,7 @@ int main()
             benchmark(gs, max_id, count);
             bitmap_set_std bm(max_id);
             benchmark(bm, max_id, count);
-            bitmap_set_asm bm2(max_id);
+            bitmap_set_raw bm2(max_id);
             benchmark(bm2, max_id, count);
             fast_hashset30<2, 8> fhs(count);
             benchmark(fhs, max_id, count);
