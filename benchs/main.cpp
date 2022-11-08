@@ -82,9 +82,8 @@ struct bitmap_set_asm
     bitmap_set_asm( size_t max_capacity )
         : count_(0)
         , capacity_( get_aligned(max_capacity, 256) / 8 )
-        , bitmap_( static_cast<uint64_t*>(aligned_malloc(capacity_, 32)) )
+        , bitmap_( static_cast<uint64_t*>(calloc(capacity_ / 8, 8)) )
         {
-            memset(bitmap_, 0, capacity_);
         }
 
     ~bitmap_set_asm()
@@ -94,10 +93,14 @@ struct bitmap_set_asm
 
     bool insert( uint32_t docid )
     {
-        if( variable_test_and_set_bit64(bitmap_[docid / 64U], docid % 64U) )
+        uint64_t &w = bitmap_[ docid / 64 ];
+        if( ((w >> (docid % 64)) & 1UL) == 1UL )
         {
             return false;
         }
+
+        w |= 1UL << (docid % 64);
+        
         ++count_;
         return true;
     }
