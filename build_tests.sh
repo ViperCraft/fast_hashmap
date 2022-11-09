@@ -3,9 +3,13 @@
 set -xe
 
 mkdir -p build
-#rm -rf build/*
+rm -rf build/*
 cd build
-cmake ..
+if [ $(which cmake3) ]; then
+  cmake3 ..
+else
+  cmake ..
+fi 
 make
 
 
